@@ -79,7 +79,17 @@ function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 
-
+app.post('/signup', function(req, res){
+  var credentials = req.body;
+  db.knex('users')
+    .insert({
+      'username' : credentials.username,
+      'password' : credentials.password
+    })
+    .then(function(entry){
+      res.send(200);
+    });
+});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
