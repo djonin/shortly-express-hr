@@ -155,14 +155,26 @@ describe('', function() {
 
       beforeEach(function(done){
         // save a link to the database
-        link = new Link({
-          url: 'http://roflzoo.com/',
-          title: 'Funny pictures of animals, funny dog pictures',
-          base_url: 'http://127.0.0.1:4568'
+        var options = {
+          'method': 'POST',
+          'uri': 'http://127.0.0.1:4568/signup',
+          'json': {
+            'username': 'Phillip',
+            'password': 'Phillip'
+          }
+        };
+
+        requestWithSession(options, function(error, res, body) {
+          link = new Link({
+            url: 'http://roflzoo.com/',
+            title: 'Funny pictures of animals, funny dog pictures',
+            base_url: 'http://127.0.0.1:4568'
+          });
+          link.save().then(function(){
+            done();
+          });
         });
-        link.save().then(function(){
-          done();
-        });
+
       });
 
       it('Returns the same shortened code', function(done) {
@@ -212,7 +224,7 @@ describe('', function() {
 
   }); // 'Link creation'
 
-  xdescribe('Priviledged Access:', function(){
+  describe('Priviledged Access:', function(){
 
     it('Redirects to login page if a user tries to access the main page and is not signed in', function(done) {
       request('http://127.0.0.1:4568/', function(error, res, body) {
@@ -285,17 +297,24 @@ describe('', function() {
 
   }); // 'Account Creation'
 
-  xdescribe('Account Login:', function(){
+  describe('Account Login:', function(){
 
     var requestWithSession = request.defaults({jar: true});
 
     beforeEach(function(done){
-      new User({
+      var options = {
+        'method': 'POST',
+        'uri': 'http://127.0.0.1:4568/signup',
+        'json': {
           'username': 'Phillip',
           'password': 'Phillip'
-      }).save().then(function(){
-        done()
+        }
+      };
+
+      request(options, function(error, res, body) {
+        done();
       });
+
     })
 
     it('Logs in existing users', function(done) {

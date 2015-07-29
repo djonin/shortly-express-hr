@@ -2,7 +2,8 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
-
+var Promise = require('bluebird');
+var bcrypt = Promise.promisifyAll(require('bcrypt-nodejs'));
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -10,7 +11,8 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
-
+var session = require('express-session');
+var cookieParser = require('cookie-parser');
 var app = express();
 
 
@@ -22,23 +24,38 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
-
+app.use(session({secret: 'shotlysecretcode'}));
 
 app.get('/', 
 function(req, res) {
-  res.render('index');
+  if (req.session.user) {
+    res.render('index');
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
 });
 
 app.get('/create', 
 function(req, res) {
-  res.render('index');
+  if (req.session.user) {
+    res.render('index');
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
 });
 
 app.get('/links', 
 function(req, res) {
-  Links.reset().fetch().then(function(links) {
-    res.send(200, links.models);
-  });
+  if (req.session.user) {
+    Links.reset().fetch().then(function(links) {
+      res.send(200, links.models);
+    });
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
 });
 
 app.post('/links', 
@@ -79,16 +96,65 @@ function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 
+app.get('/logout', function(req, res){
+  req.session.destroy(function(err){
+    res.redirect('/');
+  });
+});
+
+app.get('/login', function(req, res){
+  res.render('login');
+});
+
+app.post('/login', function(req,res){
+  var credentials = req.body;
+  bcrypt.hashAsync(credentials.password, '$2a$10$tIhQWTfpMC3Hkh7NjrgbRe', null)
+  .then(function(hash) {
+    return db.knex('users')
+            .where({
+              'username' : credentials.username,
+              'password' : hash
+            })
+            .select('username');
+  })
+  .then(function(entry) {
+    if(entry[0]) {
+      req.session.regenerate(function() {
+        req.session.user = entry[0].username;
+        res.redirect('/');
+      });
+    } else {
+      res.redirect('/login');
+    }
+  })
+  .catch(function(err) {
+    res.redirect('/login');
+  });
+});
+
+app.get('/signup', function(req, res){
+  res.render('signup');
+});
+
 app.post('/signup', function(req, res){
   var credentials = req.body;
-  db.knex('users')
-    .insert({
-      'username' : credentials.username,
-      'password' : credentials.password
+  bcrypt.hashAsync(credentials.password, '$2a$10$tIhQWTfpMC3Hkh7NjrgbRe', null)
+  .then(function(hash) {
+    return db.knex('users')
+      .insert({
+        'username' : credentials.username,
+        'password' : hash
+      });
+  })
+  .then(function(result){
+    return req.session.regenerate(function() {
+      req.session.user = credentials.username;
+      res.redirect('/');
     })
-    .then(function(entry){
-      res.send(200);
-    });
+  })
+  .catch(function(err) {
+    res.redirect('/signup');
+  });
 });
 
 /************************************************************/
