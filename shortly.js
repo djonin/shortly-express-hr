@@ -14,6 +14,8 @@ var Click = require('./app/models/click');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var openId = require('openid');
+var passport = require('passport');
+var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
 var app = express();
 
 
@@ -26,8 +28,35 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 app.use(session({secret: 'shotlysecretcode'}));
+passport.use('provider', new OAuth2Strategy({
+    authorizationURL: 'https://github.com/login/oauth/authorize',
+    tokenURL: 'https://github.com/login/oauth/access_token',
+    clientID: '7adc483fe65affb023f7',
+    clientSecret: '94a67c65787de336e8e9d4aed50c55a9b13bcb06',
+    callbackURL: 'http://shortly.autodesk.com:4568/verify2',
+    scope: 'user'
+  },
+  function(accessToken, refreshToken, profile, done) {
+    console.log("ACCESS TOKEN", accessToken, "REFRESH TOKEN", refreshToken, "PROFILE:", profile);
+    //User.findOrCreate({ githubid : profile.id }, function(err, user) {
+    //  done(err, user);
+    //});
+    done();
+  }
+));
 
-app.get('/', 
+app.get('/',
+function(req, res) {
+  console.log("SESSION:", req.session);
+  if (req.session.user) {
+    res.render('index');
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
+});
+
+app.get('/create',
 function(req, res) {
   if (req.session.user) {
     res.render('index');
@@ -37,17 +66,7 @@ function(req, res) {
   }
 });
 
-app.get('/create', 
-function(req, res) {
-  if (req.session.user) {
-    res.render('index');
-  } else {
-    req.session.error = 'Access denied!';
-    res.redirect('/login');
-  }
-});
-
-app.get('/links', 
+app.get('/links',
 function(req, res) {
   if (req.session.user) {
     Links.reset().fetch().then(function(links) {
@@ -59,7 +78,7 @@ function(req, res) {
   }
 });
 
-app.post('/links', 
+app.post('/links',
 function(req, res) {
   var uri = req.body.url;
 
@@ -136,7 +155,7 @@ app.post('/login', function(req,res){
 app.get('/signup', function(req, res){
   res.render('signup');
 });
- 
+
 app.post('/signup', function(req, res){
   var credentials = req.body;
   bcrypt.hashAsync(credentials.password, '$2a$10$tIhQWTfpMC3Hkh7NjrgbRe', null)
@@ -214,6 +233,14 @@ app.get('/verify', function(req, res){
     }
   });
 });
+
+app.get('/github', passport.authenticate('provider'));
+app.get('/verify2', function(req, res){
+  console.log("LOGGED!");
+}, passport.authenticate('provider', { successRedirect: '/', failureRedirect: '/login'}));
+
+
+
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
