@@ -13,6 +13,7 @@ var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
+var openId = require('openid');
 var app = express();
 
 
@@ -155,6 +156,27 @@ app.post('/signup', function(req, res){
   .catch(function(err) {
     res.redirect('/signup');
   });
+});
+
+app.get('/openid', function(req, res){
+  var relyingParty = new openId.RelyingParty(
+    'http://www.autodesk.com/openid',
+    //'https://accounts-staging.autodesk.com',
+    null,
+    false,
+    false,
+    []
+  );
+
+  relyingParty.authenticate("https://accounts-staging.autodesk.com", false, function(req, response){
+    console.log("REQ", req);
+    console.log("RES", response);
+    res.redirect(response);
+  });
+});
+
+app.post('/openid', function(req, res){
+
 });
 
 /************************************************************/
