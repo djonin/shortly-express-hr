@@ -136,14 +136,16 @@ app.post('/login', function(req,res){
 app.get('/signup', function(req, res){
   res.render('signup');
 });
-
+ 
 app.post('/signup', function(req, res){
   var credentials = req.body;
   bcrypt.hashAsync(credentials.password, '$2a$10$tIhQWTfpMC3Hkh7NjrgbRe', null)
   .then(function(hash) {
+    console.log("ADSK ID:", credentials.adskid);
     return db.knex('users')
       .insert({
         'username' : credentials.username,
+        'adskid' : credentials.adskid,
         'password' : hash
       });
   })
@@ -154,14 +156,14 @@ app.post('/signup', function(req, res){
     })
   })
   .catch(function(err) {
+    console.log("SIGN IN ERR:", err);
     res.redirect('/signup');
   });
 });
 
 app.get('/openid', function(req, res){
   var relyingParty = new openId.RelyingParty(
-    'http://www.autodesk.com/openid',
-    //'https://accounts-staging.autodesk.com',
+    'http://shortly.autodesk.com:4568/verify',
     null,
     false,
     false,
@@ -177,6 +179,40 @@ app.get('/openid', function(req, res){
 
 app.post('/openid', function(req, res){
 
+});
+
+app.get('/verify', function(req, res){
+  var relyingParty = new openId.RelyingParty(
+    'http://shortly.autodesk.com:4568/openid',
+    null,
+    false,
+    false,
+    []
+  );
+
+  relyingParty.verifyAssertion(req, function(err, result){
+    console.log("RESULT:", result);
+    if(result.authenticated === true){
+      db.knex('users')
+        .where({
+          'adskid' : result.claimedIdentifier
+        })
+        .select('username')
+        .then(function(entry) {
+          if(entry[0]) {
+            req.session.regenerate(function() {
+              req.session.user = entry[0].username;
+              res.redirect('/');
+            });
+          } else {
+            res.redirect('/login');
+          }
+        })
+        .catch(function(err) {
+          res.redirect('/login');
+        });
+    }
+  });
 });
 
 /************************************************************/
